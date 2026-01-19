@@ -20,11 +20,17 @@ class BriefResponse(BaseModel):
     mensaje: str
     imagen_base64: str
 
+# --- CONFIGURACIÓN DE NAVEGADOR (Anti-Bloqueo) ---
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
 # --- 1. MOTOR CRYPTO ---
 def get_crypto_data():
     try:
         url = "https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=800"
-        r = requests.get(url, timeout=10)
+        # Aquí también usamos headers por si acaso
+        r = requests.get(url, headers=HEADERS, timeout=10)
         data = r.json()
         df = pd.DataFrame(data['Data']['Data'])
         df['time'] = pd.to_datetime(df['time'], unit='s')
@@ -36,7 +42,6 @@ def get_crypto_data():
         ath = df['High'].max()
         df['SMA_730'] = df['Close'].rolling(730).mean()
         
-        # RSI
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
@@ -54,13 +59,13 @@ def get_crypto_data():
     except:
         return pd.DataFrame(), {}
 
-# --- 2. MOTOR STOCKS (Ahora con NASDAQ) ---
+# --- 2. MOTOR STOCKS ---
 def get_market_data():
     tickers = {
         "ETH-USD": "Ethereum",
         "MSTR": "MicroStrategy",
         "^GSPC": "S&P 500",
-        "^NDX": "Nasdaq 100",  # <--- AÑADIDO
+        "^NDX": "Nasdaq 100",
         "GC=F": "Oro (Gold)" 
     }
     results = {}
@@ -79,21 +84,27 @@ def get_market_data():
     except:
         return {k: (0,0) for k in tickers.values()}
 
-# --- 3. NOTICIAS (YAHOO) ---
+# --- 3. NOTICIAS (CORREGIDO CON HEADERS) ---
 def get_clean_news():
     try:
-        url = "https://finance.yahoo.com/news/rssindex"
-        r = requests.get(url, timeout=5)
+        # Usamos el feed específico de Crypto de Yahoo que suele estar más vivo
+        url = "https://finance.yahoo.com/rss/crypto"
+        # IMPORTANTE: Aquí añadimos headers=HEADERS
+        r = requests.get(url, headers=HEADERS, timeout=5)
         root = ElementTree.fromstring(r.content)
         items = root.findall('./channel/item')[:4]
         formatted = []
         for item in items:
             title = item.find('title').text
             link = item.find('link').text
-            # Enlace con icono para que iMessage lo previsualice bonito
             formatted.append(f"📰 {title}\n🔗 {link}")
+        
+        if not formatted:
+             return "Sin noticias recientes (Feed vacío)."
         return "\n\n".join(formatted)
-    except: return "Sin noticias."
+    except Exception as e:
+        # Si falla Yahoo, devolvemos el error para depurar
+        return f"Error obteniendo noticias: {str(e)}"
 
 # --- 4. REDACTOR ---
 def get_analysis(rsi, price, sma):
@@ -114,9 +125,8 @@ def briefing():
         analisis = get_analysis(btc['rsi'], btc['price'], btc['sma_2y'])
         date = datetime.now().strftime('%d %b')
 
-        # MENSAJE ACTUALIZADO V17
         msg = f"""
-🚀 *INFORME V17 – {date}*
+🦅 *INFORME V17.2 – {date}*
 
 1️⃣ *SITUACIÓN*
 {analisis}
@@ -137,11 +147,11 @@ def briefing():
 4️⃣ *TITULARES*
 {news}
 """
-        # Generar Gráfico
         buf = io.BytesIO()
         plot_df = df.tail(150)
+        
         mc = mpf.make_marketcolors(up='#00ff00', down='#ff3333', inherit=True)
-        s = mpf.make_mpf_style(marketcolors=mc, style='nightclouds', gridstyle=':')
+        s = mpf.make_mpf_style(base_mpf_style='nightclouds', marketcolors=mc, gridstyle=':') 
         
         ap = []
         if not plot_df['SMA_730'].isnull().all():
@@ -154,7 +164,6 @@ def briefing():
                 panel_ratios=(4,1), returnfig=True,
                 savefig=dict(fname=buf, dpi=100, bbox_inches='tight'))
         
-        # Leyenda
         ax = axlist[0]
         handles = [
             Line2D([0], [0], color='orange', lw=2, label='SMA 2Y'),
@@ -170,4 +179,4 @@ def briefing():
         return BriefResponse(mensaje=msg, imagen_base64=img_b64)
 
     except Exception as e:
-        return BriefResponse(mensaje=f"Error V17: {str(e)}", imagen_base64="")
+        return BriefResponse(mensaje=f"Error V17.2: {str(e)}", imagen_base64="")
