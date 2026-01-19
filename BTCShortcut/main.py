@@ -20,16 +20,26 @@ class BriefResponse(BaseModel):
     mensaje: str
     imagen_base64: str
 
-# --- CONFIGURACIÓN DE NAVEGADOR (Anti-Bloqueo) ---
+# --- HEADERS ---
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
+
+# --- HERRAMIENTA EXTRA: ACORTADOR DE URLS ---
+def make_tiny(url):
+    try:
+        # Usamos la API pública de TinyURL para limpiar el enlace
+        api_url = f"http://tinyurl.com/api-create.php?url={url}"
+        r = requests.get(api_url, timeout=2)
+        return r.text
+    except:
+        # Si falla el acortador, devolvemos el enlace original aunque sea largo
+        return url
 
 # --- 1. MOTOR CRYPTO ---
 def get_crypto_data():
     try:
         url = "https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=800"
-        # Aquí también usamos headers por si acaso
         r = requests.get(url, headers=HEADERS, timeout=10)
         data = r.json()
         df = pd.DataFrame(data['Data']['Data'])
@@ -84,27 +94,28 @@ def get_market_data():
     except:
         return {k: (0,0) for k in tickers.values()}
 
-# --- 3. NOTICIAS (CORREGIDO CON HEADERS) ---
+# --- 3. NOTICIAS (ESPAÑOL + TINYURL) ---
 def get_clean_news():
     try:
-        # Usamos el feed específico de Crypto de Yahoo que suele estar más vivo
-        url = "https://finance.yahoo.com/rss/crypto"
-        # IMPORTANTE: Aquí añadimos headers=HEADERS
+        url = "https://news.google.com/rss/search?q=Bitcoin+OR+Criptomonedas+OR+Mercados&hl=es&gl=ES&ceid=ES:es"
         r = requests.get(url, headers=HEADERS, timeout=5)
         root = ElementTree.fromstring(r.content)
-        items = root.findall('./channel/item')[:4]
+        items = root.findall('./channel/item')[:3] # Limitamos a 3 para no saturar
+        
         formatted = []
         for item in items:
-            title = item.find('title').text
-            link = item.find('link').text
-            formatted.append(f"📰 {title}\n🔗 {link}")
+            title = item.find('title').text.split(' - ')[0]
+            long_link = item.find('link').text
+            
+            # ¡MAGIA! Acortamos el enlace
+            short_link = make_tiny(long_link)
+            
+            formatted.append(f"🔹 {title}\n   👉 {short_link}")
         
-        if not formatted:
-             return "Sin noticias recientes (Feed vacío)."
+        if not formatted: return "Sin noticias."
         return "\n\n".join(formatted)
     except Exception as e:
-        # Si falla Yahoo, devolvemos el error para depurar
-        return f"Error obteniendo noticias: {str(e)}"
+        return f"Error news: {str(e)}"
 
 # --- 4. REDACTOR ---
 def get_analysis(rsi, price, sma):
@@ -126,12 +137,14 @@ def briefing():
         date = datetime.now().strftime('%d %b')
 
         msg = f"""
-🦅 *INFORME V17.2 – {date}*
+🇪🇸 *INFORME V17.5 – {date}*
 
 1️⃣ *SITUACIÓN*
+
 {analisis}
 
 2️⃣ *ACTIVOS CLAVE*
+
 • ₿ BTC: ${btc['price']:,.0f} ({btc['chg']:+.2f}%)
 • Ξ ETH: ${mk['Ethereum'][0]:,.0f} ({mk['Ethereum'][1]:+.2f}%)
 • 🏢 MSTR: ${mk['MicroStrategy'][0]:.2f} ({mk['MicroStrategy'][1]:+.2f}%)
@@ -140,11 +153,13 @@ def briefing():
 • 🥇 ORO: ${mk['Oro (Gold)'][0]:,.0f}
 
 3️⃣ *TÉCNICO BTC*
+
 • RSI (14): {btc['rsi']:.1f}
 • Media 2A: ${btc['sma_2y']:,.0f}
 • Soporte: ${btc['range_low']:,.0f}
 
 4️⃣ *TITULARES*
+
 {news}
 """
         buf = io.BytesIO()
@@ -179,4 +194,4 @@ def briefing():
         return BriefResponse(mensaje=msg, imagen_base64=img_b64)
 
     except Exception as e:
-        return BriefResponse(mensaje=f"Error V17.2: {str(e)}", imagen_base64="")
+        return BriefResponse(mensaje=f"Error V17.5: {str(e)}", imagen_base64="")
