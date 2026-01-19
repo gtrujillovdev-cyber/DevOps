@@ -36,6 +36,7 @@ def get_crypto_data():
         ath = df['High'].max()
         df['SMA_730'] = df['Close'].rolling(730).mean()
         
+        # RSI
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
@@ -53,12 +54,13 @@ def get_crypto_data():
     except:
         return pd.DataFrame(), {}
 
-# --- 2. MOTOR STOCKS (YFINANCE) ---
+# --- 2. MOTOR STOCKS (Ahora con NASDAQ) ---
 def get_market_data():
     tickers = {
         "ETH-USD": "Ethereum",
         "MSTR": "MicroStrategy",
         "^GSPC": "S&P 500",
+        "^NDX": "Nasdaq 100",  # <--- AÑADIDO
         "GC=F": "Oro (Gold)" 
     }
     results = {}
@@ -77,7 +79,7 @@ def get_market_data():
     except:
         return {k: (0,0) for k in tickers.values()}
 
-# --- 3. NOTICIAS (YAHOO - LINKS LIMPIOS) ---
+# --- 3. NOTICIAS (YAHOO) ---
 def get_clean_news():
     try:
         url = "https://finance.yahoo.com/news/rssindex"
@@ -88,6 +90,7 @@ def get_clean_news():
         for item in items:
             title = item.find('title').text
             link = item.find('link').text
+            # Enlace con icono para que iMessage lo previsualice bonito
             formatted.append(f"📰 {title}\n🔗 {link}")
         return "\n\n".join(formatted)
     except: return "Sin noticias."
@@ -95,10 +98,10 @@ def get_clean_news():
 # --- 4. REDACTOR ---
 def get_analysis(rsi, price, sma):
     trend = "ALCISTA 🐂" if price > sma else "BAJISTA 🐻"
-    if rsi > 70: sent = "⚠️ SOBRECOMPRA: Riesgo de corrección."
-    elif rsi < 30: sent = "💎 OPORTUNIDAD: Zona de rebote."
-    else: sent = "⚖️ NEUTRAL: Consolidación."
-    return f"{sent} Tendencia 2Y: {trend}"
+    if rsi > 70: sent = "⚠️ SOBRECOMPRA: Riesgo de corrección a corto plazo."
+    elif rsi < 30: sent = "💎 OPORTUNIDAD: Zona de rebote técnico."
+    else: sent = "⚖️ NEUTRAL: Mercado consolidando niveles."
+    return f"{sent} Tendencia de fondo (2Y): {trend}"
 
 @app.get("/briefing", response_model=BriefResponse)
 def briefing():
@@ -111,8 +114,9 @@ def briefing():
         analisis = get_analysis(btc['rsi'], btc['price'], btc['sma_2y'])
         date = datetime.now().strftime('%d %b')
 
+        # MENSAJE ACTUALIZADO V17
         msg = f"""
-🦅 *INFORME V16 – {date}*
+🚀 *INFORME V17 – {date}*
 
 1️⃣ *SITUACIÓN*
 {analisis}
@@ -122,6 +126,7 @@ def briefing():
 • Ξ ETH: ${mk['Ethereum'][0]:,.0f} ({mk['Ethereum'][1]:+.2f}%)
 • 🏢 MSTR: ${mk['MicroStrategy'][0]:.2f} ({mk['MicroStrategy'][1]:+.2f}%)
 • 🏛 SP500: {mk['S&P 500'][0]:,.0f} ({mk['S&P 500'][1]:+.2f}%)
+• 💻 NDX: {mk['Nasdaq 100'][0]:,.0f} ({mk['Nasdaq 100'][1]:+.2f}%)
 • 🥇 ORO: ${mk['Oro (Gold)'][0]:,.0f}
 
 3️⃣ *TÉCNICO BTC*
@@ -132,9 +137,9 @@ def briefing():
 4️⃣ *TITULARES*
 {news}
 """
+        # Generar Gráfico
         buf = io.BytesIO()
         plot_df = df.tail(150)
-        
         mc = mpf.make_marketcolors(up='#00ff00', down='#ff3333', inherit=True)
         s = mpf.make_mpf_style(marketcolors=mc, style='nightclouds', gridstyle=':')
         
@@ -149,6 +154,7 @@ def briefing():
                 panel_ratios=(4,1), returnfig=True,
                 savefig=dict(fname=buf, dpi=100, bbox_inches='tight'))
         
+        # Leyenda
         ax = axlist[0]
         handles = [
             Line2D([0], [0], color='orange', lw=2, label='SMA 2Y'),
@@ -164,4 +170,4 @@ def briefing():
         return BriefResponse(mensaje=msg, imagen_base64=img_b64)
 
     except Exception as e:
-        return BriefResponse(mensaje=f"Error V16: {str(e)}", imagen_base64="")
+        return BriefResponse(mensaje=f"Error V17: {str(e)}", imagen_base64="")
