@@ -3,6 +3,8 @@ import requests
 import pandas as pd
 from datetime import datetime
 
+import os
+
 # Configuración de página con diseño profesional y responsive
 st.set_page_config(
     page_title="DevOps System Monitor",
@@ -11,7 +13,7 @@ st.set_page_config(
 )
 
 # Definir la URL de la API mediante variable de entorno o fallback local
-API_URL = "http://127.0.0.1:8000/metrics"
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/metrics")
 
 st.markdown("""
 <style>
@@ -140,9 +142,9 @@ def render_dashboard():
             if expected_cols.issubset(proc_df.columns):
                 proc_df = proc_df[['pid', 'name', 'cpu_percent']]
                 proc_df.columns = ['PID', 'Nombre del Proceso', 'CPU %']
-                st.dataframe(proc_df, use_container_width=True, hide_index=True)
+                st.dataframe(proc_df, width="stretch", hide_index=True)
             else:
-                st.dataframe(proc_df, use_container_width=True)
+                st.dataframe(proc_df, width="stretch")
         else:
             st.write("No hay información de procesos disponible.")
 

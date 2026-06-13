@@ -1,0 +1,61 @@
+# ==============================================================================
+# Docker Compose para orquestar la plataforma de System Monitor
+# ==============================================================================
+
+services:
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: collector
+    volumes:
+      # Volumen compartido para persistir logs estructurados
+      - log-data:/app/logs
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Montado en modo solo lectura (ro) por seguridad
+      - log-data:/app/logs:ro
+    depends_on:
+      - collector
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      # Apunta a la API dentro de la red interna de Docker
+      - API_URL=http://api:8000/metrics
+    depends_on:
+      - api
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Volumen nombrado para compartir y persistir la información de logs
+volumes:
+  log-data:
