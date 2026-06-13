@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from api import app
+from api.api import app
 
 client = TestClient(app)
 
@@ -9,7 +9,7 @@ def test_metrics_endpoint_empty(monkeypatch):
     Verifica que el endpoint GET /metrics responda correctamente (200 OK)
     cuando no hay registros de logs (retorna lista vacía).
     """
-    monkeypatch.setattr("api.read_logs", lambda: [])
+    monkeypatch.setattr("api.api.read_logs", lambda: [])
     response = client.get("/metrics")
     assert response.status_code == 200
     assert response.json() == []
@@ -31,7 +31,7 @@ def test_metrics_endpoint_with_data(monkeypatch):
             "top_processes": []
         }
     ]
-    monkeypatch.setattr("api.read_logs", lambda: mock_logs)
+    monkeypatch.setattr("api.api.read_logs", lambda: mock_logs)
     response = client.get("/metrics")
     assert response.status_code == 200
     assert response.json() == mock_logs

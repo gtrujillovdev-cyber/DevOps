@@ -55,12 +55,12 @@ trap cleanup SIGINT SIGTERM
 
 # 1. Iniciar Recolector
 echo -e "${GREEN}🟢 1/3 Iniciando Recolector (monitor.py)...${NC}"
-python monitor.py > /dev/null 2>&1 &
+python collector/monitor.py > /dev/null 2>&1 &
 MONITOR_PID=$!
 
 # 2. Iniciar API (FastAPI)
 echo -e "${GREEN}🟢 2/3 Iniciando API (FastAPI)...${NC}"
-python -m uvicorn api:app --port 8000 --log-level warning > /dev/null 2>&1 &
+python -m uvicorn api.api:app --port 8000 --log-level warning > /dev/null 2>&1 &
 API_PID=$!
 
 # Esperar un momento a que la API esté lista antes de lanzar el dashboard
@@ -68,7 +68,7 @@ sleep 1.5
 
 # 3. Iniciar Dashboard (Streamlit)
 echo -e "${GREEN}🟢 3/3 Iniciando Dashboard (Streamlit)...${NC}"
-streamlit run dashboard.py --server.headless true --server.port 8501 > /dev/null 2>&1 &
+streamlit run dashboard/dashboard.py --server.headless true --server.port 8501 > /dev/null 2>&1 &
 DASHBOARD_PID=$!
 
 echo -e "${BLUE}====================================================${NC}"

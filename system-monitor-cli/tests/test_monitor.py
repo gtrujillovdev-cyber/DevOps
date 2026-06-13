@@ -1,5 +1,5 @@
 import pytest
-from monitor import collect_metrics
+from collector.monitor import collect_metrics
 
 def test_collect_metrics():
     """
